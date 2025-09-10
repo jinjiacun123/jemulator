@@ -1,2 +1,8 @@
+#jemulator
+
+## DEMO
+* 基于rokuyon的代码进行图像渲染改写后的demo代码。(/demo/n64_from_rokuyon)
+
+
 init
 this is multi platform emulator,e.g.,chip8,gb,nes,snens,gba,ds,and so on 
