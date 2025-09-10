@@ -1,7 +1,7 @@
 #jemulator
 
 ## DEMO
-* 基于rokuyon的代码进行图像渲染改写后的demo代码。(/demo/n64_from_rokuyon)
+* 基于rokuyon的代码进行图像渲染改写（使基于sdl的open gl)后的demo代码。(/demo/n64_from_rokuyon)
 
 
 init
