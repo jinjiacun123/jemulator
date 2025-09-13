@@ -27,19 +27,19 @@
 
 namespace CPU_CP0
 {
-    uint32_t _index;
-    uint32_t entryLo0;
-    uint32_t entryLo1;
+	//[by jim]: to use by tlb
+	uint32_t entryHi;
+
+	
     uint32_t context;
     uint32_t pageMask;
     uint32_t badVAddr;
+	
     uint32_t count;
-    uint32_t entryHi;
+    
     uint32_t compare;
     uint32_t status;
-    uint32_t cause;
-    uint32_t epc;
-    uint32_t errorEpc;
+    uint32_t cause;   
 
     bool irqPending;
     uint32_t startCycles;
@@ -47,56 +47,33 @@ namespace CPU_CP0
 
     void scheduleCount();
     void updateCount();
-    void interrupt();
-
 
 }
 
 void CPU_CP0::reset()
 {
     // Reset the CPU CP0 to its initial state
-    _index = 0;
-    entryLo0 = 0;
-    entryLo1 = 0;
+	entryHi = 0;
+
     context = 0;
     pageMask = 0;
     badVAddr = 0;
     count = 0;
-    entryHi = 0;
+    
     compare = 0;
     status = 0x400004;
     cause = 0;
-    epc = 0;
-    errorEpc = 0;
     irqPending = false;
     endCycles = -1;
     scheduleCount();
 }
 
-int32_t CPU_CP0::read(int index)
-{
-	UNIMPLEMENT;
-}
 
 void CPU_CP0::write(int index, int32_t value) //[by jim] need
 {
     // Write to a CPU CP0 register if one exists at the given index
     switch (index)
     {
-        case 0: // Index
-			UNIMPLEMENT
-
-        case 2: // EntryLo0
-			UNIMPLEMENT
-
-        case 3: // EntryLo1
-			UNIMPLEMENT
-
-        case 4: // Context
-			UNIMPLEMENT
-
-        case 5: // PageMask
-			UNIMPLEMENT
 
         case 9: // Count
 #if 1			
@@ -107,9 +84,6 @@ void CPU_CP0::write(int index, int32_t value) //[by jim] need
 #else
 			UNIMPLEMENT
 #endif
-
-        case 10: // EntryHi
-			UNIMPLEMENT
 
         case 11: // Compare
 #if 1			
@@ -125,10 +99,6 @@ void CPU_CP0::write(int index, int32_t value) //[by jim] need
 			UNIMPLEMENT
 #endif			
 
-        case 12: // Status
-			UNIMPLEMENT
-
-
         case 13: // Cause
 #if 1			
             // Set the software interrupt flags
@@ -138,12 +108,6 @@ void CPU_CP0::write(int index, int32_t value) //[by jim] need
 #else
 			UNIMPLEMENT
 #endif
-
-        case 14: // EPC
-			UNIMPLEMENT
-
-        case 30: // ErrorEPC
-			UNIMPLEMENT
 
         default:
             LOG_WARN("Write to unknown CPU CP0 register: %d\n", index);
@@ -202,59 +166,35 @@ void CPU_CP0::checkInterrupts()//[by jim] need
 #if 1
     // Set the external interrupt bit if any MI interrupt is set
     cause = (cause & ~0x400) | ((bool)(MI::interrupt & MI::mask) << 10);
-
-    // Schedule an interrupt if able and an enabled bit is set
-    if (((status & 0x3) == 0x1) && (status & cause & 0xFF00) && !irqPending)
-    {
-        Core::schedule(interrupt, 2); // 1 CPU cycle
-        irqPending = true;
-    }
 #else
 	UNIMPLEMENT;
 #endif
 }
 
-void CPU_CP0::interrupt()
-{
-	UNIMPLEMENT;
-}
-
-void CPU_CP0::exception(uint8_t type)//[by jim] need
+void CPU_CP0::exception(uint8_t type)//[by jim] need,  where type in (3, 11, 12)
+										/**
+										* type(or exception code) == 3 => TLB Miss - Store(Thrown when no valid TLB entry is found when translating an address to be used for a store (data access))
+										* type == 11 => Coprocessor Unusable (Thrown when a coprocessor instruction is used when that coprocessor is disabled. Note that COP0 is never disabled)
+										* type == 12 => Arithmetic Overflow(hrown by arithmetic instructions when their operations overflow.)
+										*/
 {
 #if 1
     // Update registers for an exception and jump to the handler
     // TODO: handle nested exceptions
     status |= 0x2; // EXL
     cause = (cause & ~0x8000007C) | ((type << 2) & 0x7C);
-    epc = CPU::programCounter - (type ? 4 : 0);
-    CPU::programCounter = ((status & (1 << 22)) ? 0xBFC00200 : 0x80000000) - 4;
+#if 1// [by jim] ??
     CPU::nextOpcode = 0;
-
-    // Adjust the exception vector based on the type
-    if ((type & ~1) != 2) // Not TLB miss
-        CPU::programCounter += 0x180;
+#endif	
 
     // Return to the preceding branch if the exception occured in a delay slot
     if (CPU::delaySlot != -1)
     {
-        epc = CPU::delaySlot - 4;
         cause |= (1 << 31); // BD
     }
 
     // Unhalt the CPU if it was idling
     Core::cpuRunning = true;
-#else
-	UNIMPLEMENT;
-#endif
-}
-
-void CPU_CP0::setTlbAddress(uint32_t address)//[by jim] need
-{
-#if 1
-    // Set the address that caused a TLB exception
-    badVAddr = address;
-    entryHi = address & 0xFFFFE000;
-    context = (context & ~0x7FFFF0) | ((address >> 9) & 0x7FFFF0);
 #else
 	UNIMPLEMENT;
 #endif

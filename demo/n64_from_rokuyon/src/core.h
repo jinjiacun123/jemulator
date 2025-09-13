@@ -28,18 +28,14 @@ namespace Core
     extern bool running;
     extern bool cpuRunning;
     extern uint32_t globalCycles;
-    extern int fps;
 
     extern uint8_t *rom;
-    extern uint8_t *save;
     extern uint32_t romSize;
-    extern uint32_t saveSize;
 
     bool bootRom(const std::string &path);
     void start();
     void stop();
-
-    void countFrame();
+	
     void schedule(void (*function)(), uint32_t cycles);
 }
 

@@ -38,21 +38,12 @@ namespace PIF
     int8_t stickX;
     int8_t stickY;
 
-    extern void (*pifCommands[])(int);
-
     uint32_t crc32(uint8_t *data, size_t size);
     void joybusProtocol(int bit);
     void verifyChecksum(int bit);
     void clearMemory(int bit);
     void unknownCmd(int bit);
 }
-
-// Small command lookup table for PIF command bits
-void (*PIF::pifCommands[7])(int) =
-{
-    joybusProtocol, unknownCmd,     unknownCmd, unknownCmd, // 0-3
-    unknownCmd,     verifyChecksum, clearMemory             // 4-6
-};
 
 uint32_t PIF::crc32(uint8_t *data, size_t size)//[by jim] need
 {
@@ -84,14 +75,6 @@ void PIF::reset() //[by jim] need
     buttons = 0;
     stickX = 0;
     stickY = 0;
-
-    // Set a mask and ID for 0.5KB/2KB EEPROM, or disable EEPROM
-    switch (Core::saveSize)
-    {
-        case 0x200: eepromMask = 0x1FF; eepromId = 0x80; break;
-        case 0x800: eepromMask = 0x7FF; eepromId = 0xC0; break;
-        default:    eepromMask = 0x000; eepromId = 0x00; break;
-    }
 
     // Set the CIC seed based on which bootcode is detected
     // This value is used during boot to calculate a checksum
@@ -127,13 +110,6 @@ void PIF::reset() //[by jim] need
             break;
     }
 
-    if (FILE *pifFile = fopen("pif_rom.bin", "rb"))
-    {
-        // Load the PIF ROM into memory if it exists
-        fread(memory, sizeof(uint8_t), 0x7C0, pifFile);
-        fclose(pifFile);
-    }
-    else
     {
         // Set CPU registers as if the PIF ROM was executed
         // Values from https://github.com/mikeryan/n64dev/blob/master/src/boot/pif.S
@@ -171,7 +147,7 @@ void PIF::reset() //[by jim] need
 
         // Copy the IPL3 from ROM to DMEM and jump to the start address
         for (uint32_t i = 0; i < 0x1000; i++)
-            Memory::write(0xA4000000 + i, Core::rom[i]);
+            Memory::write(0xA4000000 + i, Core::rom[i]);//[by jim] Memory::write(0xA4000000 + i, Memory::read(0xB0000000 + i))
         CPU::programCounter = 0xA4000040 - 4;
     }
 

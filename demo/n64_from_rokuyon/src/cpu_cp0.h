@@ -25,13 +25,11 @@
 namespace CPU_CP0
 {
     void reset();
-    int32_t read(int index);
     void write(int index, int32_t value);
 
     void resetCycles();
     void checkInterrupts();
     void exception(uint8_t type);
-    void setTlbAddress(uint32_t address);
     bool cpUsable(uint8_t cp);
 }
 

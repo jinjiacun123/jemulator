@@ -252,7 +252,6 @@ void VI::drawFrame()//[by jim] need
 
     // Schedule the next frame to be drawn
     Core::schedule(drawFrame, (93750000 / 60) * 2);
-    Core::countFrame();
 #else
 	UNIMPLEMENT;
 #endif	

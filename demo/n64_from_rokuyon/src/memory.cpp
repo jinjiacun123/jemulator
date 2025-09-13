@@ -22,7 +22,7 @@
 
 #include "common.h"
 #include "memory.h"
-#include "ai.h"
+//#include "ai.h"
 #include "core.h"
 #include "cpu_cp0.h"
 #include "log.h"
@@ -110,49 +110,26 @@ template uint64_t Memory::read(uint32_t address);
 template <typename T> T Memory::read(uint32_t address)
 {
     uint8_t *data = nullptr;
-    uint32_t pAddr = 0x80000000;
+    uint32_t pAddr = 0x80000000;	//[by jim]:phisical address
 
+#if 1 //[by jim] translate virtual address to physical address
     // Get a physical address from a virtual one
     if ((address & 0xC0000000) == 0x80000000) // kseg0, kseg1
     {
         // Mask the virtual address to get a physical one
         pAddr = address & 0x1FFFFFFF;
     }
-    else // TLB
-    {
-        // Search the TLB entries for a page that contains the virtual address
-        // TODO: actually use the ASID and CDVG bits, and support TLB invalid exceptions
-        for (int i = 0; i < 32; i++)
-        {
-            uint32_t vAddr = entries[i].entryHi & 0xFFFFE000;
-            uint32_t mask = entries[i].pageMask | 0x1FFF;
-
-            if (address - vAddr <= mask)
-            {
-                // Choose between the even or odd physical pages, and add the masked offset
-                if (address - vAddr <= (mask >> 1))
-                    pAddr = ((entries[i].entryLo0 & 0x3FFFFC0) << 6) + (address & (mask >> 1));
-                else
-                    pAddr = ((entries[i].entryLo1 & 0x3FFFFC0) << 6) + (address & (mask >> 1));
-                goto lookup;
-            }
-        }
-
-        // Trigger a TLB load miss exception if a TLB entry wasn't found
-        CPU_CP0::exception(2);
-        CPU_CP0::setTlbAddress(address);
-        return 0;
-    }
+#endif
 
 lookup:
     // Look up the physical address
-    if (pAddr < ramSize)
+    if (pAddr < ramSize) //[by jim] mapping in ram
     {
         // Get a pointer to data in RDRAM
         // TODO: figure out RDRAM registers and how they affect mapping
         data = &rdram[pAddr];
     }
-    else if (pAddr >= 0x4000000 && pAddr < 0x4040000)
+    else if (pAddr >= 0x4000000 && pAddr < 0x4040000) //[by jim] mapping rsp data memory / instruction memory
     {
         // Read a value from RSP DMEM/IMEM, with wraparound
         T value = 0;
@@ -160,25 +137,12 @@ lookup:
             value |= (T)rspMem[(pAddr & 0x1000) | ((pAddr + i) & 0xFFF)] << ((sizeof(T) - 1 - i) * 8);
         return value;
     }
-    else if (pAddr >= 0x8000000 && pAddr < 0x8008000 && Core::saveSize == 0x8000)
-    {
-        // Get a pointer to data in cart SRAM, if it exists
-        data = &Core::save[pAddr & 0x7FFF];
-    }
-    else if (pAddr >= 0x8000000 && pAddr < 0x8020000 && Core::saveSize == 0x20000)
-    {
-        // Get a pointer to data in cart FLASH, if it's readable
-        if (state == FLASH_READ)
-            data = &Core::save[address & 0x1FFFF];
-        else
-            return status >> ((~(address + sizeof(T) - 1) & 0x7) * 8);
-    }
     else if (pAddr >= 0x10000000 && pAddr < 0x10000000 + std::min(Core::romSize, 0xFC00000U))
     {
         // Get a pointer to data in cart ROM
         data = &Core::rom[pAddr - 0x10000000];
     }
-    else if (pAddr >= 0x1FC00000 && pAddr < 0x1FC00800)
+    else if (pAddr >= 0x1FC00000 && pAddr < 0x1FC00800) //[by jim] mapping to pif
     {
         // Get a pointer to data in PIF ROM/RAM
         data = &PIF::memory[pAddr & 0x7FF];
@@ -187,28 +151,10 @@ lookup:
     {
         // Ignore I/O writes that aren't 32-bit
     }
-    else if (pAddr >= 0x4040000 && pAddr < 0x4040020)
-    {
-#if 0
-        // Read a value from an RSP CP0 register
-        return RSP_CP0::read((pAddr & 0x1F) >> 2);
-#else
-		UNIMPLEMENT;
-#endif
-    }
     else if (pAddr == 0x4080000)
     {
         // Read a value from the RSP program counter
         return RSP::readPC();
-    }
-    else if (pAddr >= 0x4100000 && pAddr < 0x4100020)
-    {
-    #if 0
-        // Read a value from an RDP register
-        return RDP::read((pAddr & 0x1F) >> 2);
-	#else
-	UNIMPLEMENT;
-	#endif
     }
     else if (pAddr == 0x470000C)
     {
@@ -220,31 +166,7 @@ lookup:
         // Read a value from a group of registers
         switch (pAddr >> 20)
         {
-            case 0x43:UNIMPLEMENT;
-            case 0x44: {
-#if 0
-				return VI::read(pAddr);
-#else
-				UNIMPLEMENT;
-#endif
-            	}
-            case 0x45: {
-				#if 0
-				return AI::read(pAddr);
-				#else
-				printf("unimplement [%s:%d]-->%s\n", __FUNCTION__, __LINE__, __FILE__);
-				exit(-1);
-				#endif
-            	}
             case 0x46: return PI::read(pAddr);
-            case 0x48: 
-            	{
-            	#if 0
-				return SI::read(pAddr);
-				#else
-				UNIMPLEMENT;
-				#endif
-            	}
         }
     }
 
@@ -270,7 +192,7 @@ template <typename T> void Memory::write(uint32_t address, T value)
     uint8_t *data = nullptr;
     uint32_t pAddr = 0x80000000;
 
-    // Get a physical address from a virtual one
+#if 1    // Get a physical address from a virtual one
     if ((address & 0xC0000000) == 0x80000000) // kseg0, kseg1
     {
         // Mask the virtual address to get a physical one
@@ -280,76 +202,36 @@ template <typename T> void Memory::write(uint32_t address, T value)
     {
         // Search the TLB entries for a page that contains the virtual address
         // TODO: actually use the ASID and CDVG bits, and support TLB invalid exceptions
-        for (int i = 0; i < 32; i++)
-        {
-            uint32_t vAddr = entries[i].entryHi & 0xFFFFE000;
-            uint32_t mask = entries[i].pageMask | 0x1FFF;
-
-            if (address - vAddr <= mask)
-            {
-                // Choose between the even or odd physical pages, and add the masked offset
-                if (address - vAddr <= (mask >> 1))
-                {
-                    if (entries[i].entryLo0 & 0x4) // Dirty
-                    {
-                        pAddr = ((entries[i].entryLo0 & 0x3FFFFC0) << 6) + (address & (mask >> 1));
-                        goto lookup;
-                    }
-                }
-                else
-                {
-                    if (entries[i].entryLo1 & 0x4) // Dirty
-                    {
-                        pAddr = ((entries[i].entryLo1 & 0x3FFFFC0) << 6) + (address & (mask >> 1));
-                        goto lookup;
-                    }
-                }
-
-                // Trigger a TLB modification exception if the TLB entry isn't writable
-                CPU_CP0::exception(1);
-                CPU_CP0::setTlbAddress(address);
-                return;
-            }
-        }
 
         // Trigger a TLB store miss exception if a TLB entry wasn't found
+        //printf("vaddress:0x%02x\n", address);
+        //UNIMPLEMENT
         CPU_CP0::exception(3);
-        CPU_CP0::setTlbAddress(address);
         return;
     }
+#endif
 
 lookup:
     // Look up the physical address
-    if (pAddr < ramSize)
-    {
+    if (pAddr < ramSize) //[by jim] ram
+    { 
         // Get a pointer to data in RDRAM
         // TODO: figure out RDRAM registers and how they affect mapping
         data = &rdram[pAddr];
     }
-    else if (pAddr >= 0x4000000 && pAddr < 0x4040000)
+    else if (pAddr >= 0x4000000 && pAddr < 0x4040000)//[by jim]setting rsp imem/dmem
     {
         // Write a value to RSP DMEM/IMEM, with wraparound
         for (size_t i = 0; i < sizeof(T); i++)
             rspMem[(pAddr & 0x1000) | ((pAddr + i) & 0xFFF)] = value >> ((sizeof(T) - 1 - i) * 8);
         return;
     }
-    else if (pAddr >= 0x8000000 && pAddr < 0x8008000 && Core::saveSize == 0x8000)
-    {
-#if 0
-        // Write a value to cart SRAM, if it exists
-        for (size_t i = 0; i < sizeof(T); i++)
-            Core::writeSave((pAddr + i) & 0x7FFF, value >> ((sizeof(T) - 1 - i) * 8));
-        return;
-#else
-	UNIMPLEMENT;
-#endif
-    }
-    else if (pAddr >= 0x8000000 && pAddr < 0x8000080 && state == FLASH_WRITE)
+    else if (pAddr >= 0x8000000 && pAddr < 0x8000080 && state == FLASH_WRITE) //[by jim] flash
     {
         // Get a pointer to data in the FLASH write buffer, if it's writable
         data = &writeBuf[address & 0x7F];
     }
-    else if (pAddr >= 0x1FC007C0 && pAddr < 0x1FC00800)
+    else if (pAddr >= 0x1FC007C0 && pAddr < 0x1FC00800)//[by jim]: bios
     {
         // Get a pointer to data in PIF ROM/RAM
         data = &PIF::memory[pAddr & 0x7FF];
@@ -357,59 +239,38 @@ lookup:
         // Catch writes to the PIF command byte and call the PIF
         if (pAddr >= 0x1FC00800 - sizeof(T))
         {
-        #if 0
-            for (size_t i = 0; i < sizeof(T); i++)
-                data[i] = value >> ((sizeof(T) - 1 - i) * 8);
-            PIF::runCommand();
-            return;
-			#else
 			UNIMPLEMENT;
-			#endif
         }
     }
     else if (sizeof(T) != sizeof(uint32_t))
     {
         // Ignore I/O writes that aren't 32-bit
     }
-    else if (pAddr >= 0x4040000 && pAddr < 0x4040020)
+    else if (pAddr >= 0x4040000 && pAddr < 0x4040020)//[by jim] about rsp cp0
     {
         // Write a value to an RSP CP0 register
         return RSP_CP0::write((pAddr & 0x1F) >> 2, value);
     }
-    else if (pAddr == 0x4080000)
+    else if (pAddr == 0x4080000) //[by jim]: write to rsp program counter
     {
         // Write a value to the RSP program counter
         return RSP::writePC(value);
-    }
-    else if (pAddr >= 0x4100000 && pAddr < 0x4100020)
-    {
-    #if 0
-        // Write a value to an RDP register
-        return RDP::write((pAddr & 0x1F) >> 2, value);
-	#else
-	UNIMPLEMENT;	
-	#endif
-    }
-    else if (pAddr == 0x8010000 && Core::saveSize == 0x20000)
-    {
-#if 1
-    	 printf("unimplement function %s\n", __FUNCTION__);
-		exit(-1);	
-#else		
-        // Write a value to the FLASH register
-        return writeFlash(value);
-#endif
     }
     else
     {
         // Write a value to a group of registers
         switch (pAddr >> 20)
         {
-            case 0x43: return MI::write(pAddr, value);
-            case 0x44: return VI::write(pAddr, value);
-            case 0x45: return AI::write(pAddr, value);
-            case 0x46: return PI::write(pAddr, value);
-            case 0x48: return SI::write(pAddr, value);
+            case 0x43: return MI::write(pAddr, value);//[by jim]: media
+            case 0x44: return VI::write(pAddr, value);//[by jim]: video
+            case 0x45: 
+				#if 0
+				return AI::write(pAddr, value);//[by jim]: audio
+				#else
+				;
+				#endif
+            case 0x46: return PI::write(pAddr, value);//[by jim]: PI bus 
+            case 0x48: return SI::write(pAddr, value);//[by jim]: SI interrupt
         }
     }
 

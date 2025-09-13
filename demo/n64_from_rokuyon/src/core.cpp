@@ -26,7 +26,7 @@
 
 #include "common.h"
 #include "core.h"
-#include "ai.h"
+//#include "ai.h"
 #include "cpu.h"
 #include "cpu_cp0.h"
 #include "cpu_cp1.h"
@@ -57,10 +57,8 @@ struct Task
 namespace Core
 {
     std::thread *emuThread;
-    std::thread *saveThread;
     std::condition_variable condVar;
     std::mutex waitMutex;
-    std::mutex saveMutex;
 
     bool running;
     bool cpuRunning;
@@ -68,20 +66,10 @@ namespace Core
     std::vector<Task> tasks;
     uint32_t globalCycles;
     uint32_t cpuCycles;
-
-    int fps;
-    int fpsCount;
-    std::chrono::steady_clock::time_point lastFpsTime;
-
-    std::string savePath;
     uint8_t *rom;
-    uint8_t *save;
     uint32_t romSize;
-    uint32_t saveSize;
-    bool saveDirty;
-
+	
     void runLoop();
-    void updateSave();
     void resetCycles();
 }
 
@@ -116,7 +104,7 @@ bool Core::bootRom(const std::string &path)//[by jim]:<-------------------------
 #if 1 //[by jim] some reset 
     // Reset the emulated components
     Memory::reset();
-    AI::reset();		//[by jim]: audio stream deal
+   // AI::reset();		//[by jim]: audio stream deal
     CPU::reset();       //[by jim]: main cpu interpreter
     CPU_CP0::reset();   
     CPU_CP1::reset();
@@ -124,7 +112,7 @@ bool Core::bootRom(const std::string &path)//[by jim]:<-------------------------
     PI::reset();
     SI::reset();
     VI::reset();
-    PIF::reset();
+    PIF::reset();		//[by jim]: about bios
     RDP::reset();
     RSP_CP0::reset();
 #endif
@@ -190,26 +178,6 @@ void Core::runLoop()//[by jim] need
             (*tasks[0].function)();                          // [by jim] 3. task scheduled
             tasks.erase(tasks.begin());
         }
-    }
-}
-
-
-void Core::countFrame()//[by jim] need
-{
-    // Calculate the time since the FPS was last updated
-    std::chrono::duration<double> fpsTime = std::chrono::steady_clock::now() - lastFpsTime;
-
-    if (fpsTime.count() >= 1.0f)
-    {
-        // Update the FPS value after one second and reset the counter
-        fps = fpsCount;
-        fpsCount = 0;
-        lastFpsTime = std::chrono::steady_clock::now();
-    }
-    else
-    {
-        // Count another frame
-        fpsCount++;
     }
 }
 
