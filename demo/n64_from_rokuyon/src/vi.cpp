@@ -122,7 +122,6 @@ void VI::write(uint32_t address, uint32_t value)//[by jim] need
         case 0x4400010: // VI_V_CURRENT
 #if 1			
             // Acknowledge a VI interrupt instead of writing a value
-            MI::clearInterrupt(3);
             return;
 			
 		#else
@@ -248,7 +247,6 @@ void VI::drawFrame()//[by jim] need
 
     // Finish the frame and request a VI interrupt
     // TODO: request interrupt at the proper time
-    MI::setInterrupt(3);
 
     // Schedule the next frame to be drawn
     Core::schedule(drawFrame, (93750000 / 60) * 2);

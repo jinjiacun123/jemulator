@@ -31,17 +31,16 @@ namespace CPU_CP1
     bool fullMode;
     uint64_t registers[32];
     uint32_t status;
-
-    float &getFloat(int index);
-    double &getDouble(int index);
 }
 
 void CPU_CP1::reset()	 //[by jim] need
 {
+#if 0
     // Reset the CPU CP1 to its initial state
     fullMode = false;
     memset(registers, 0, sizeof(registers));
     status = 0;
+#endif	
 }
 
 

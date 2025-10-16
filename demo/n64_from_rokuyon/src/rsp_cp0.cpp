@@ -68,12 +68,6 @@ void RSP_CP0::write(int index, uint32_t value)//[by jim] need
             if (value & 0x4)
                 status &= ~0x2;
 
-            // Acknowledge or trigger an SP interrupt
-            if (value & 0x8)
-                MI::clearInterrupt(0);
-            else if (value & 0x10)
-                MI::setInterrupt(0);
-
             // Set or clear the remaining status bits
             for (int i = 0; i < 20; i += 2)
             {

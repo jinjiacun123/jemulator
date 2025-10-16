@@ -26,10 +26,8 @@
 
 #include "common.h"
 #include "core.h"
-//#include "ai.h"
 #include "cpu.h"
 #include "cpu_cp0.h"
-#include "cpu_cp1.h"
 #include "log.h"
 #include "memory.h"
 #include "mi.h"
@@ -106,8 +104,7 @@ bool Core::bootRom(const std::string &path)//[by jim]:<-------------------------
     Memory::reset();
    // AI::reset();		//[by jim]: audio stream deal
     CPU::reset();       //[by jim]: main cpu interpreter
-    CPU_CP0::reset();   
-    CPU_CP1::reset();
+    CPU_CP0::reset();
     MI::reset();
     PI::reset();
     SI::reset();

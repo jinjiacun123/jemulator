@@ -33,9 +33,6 @@ namespace CPU_CP1
 {
 
     void reset();
-    uint64_t read(CP1Type type, int index);
-    void write(CP1Type type, int index, uint64_t value);
-    void setRegMode(bool full);
 }
 
 #endif // CPU_CP1_H

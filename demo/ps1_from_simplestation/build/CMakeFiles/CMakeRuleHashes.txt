@@ -1,0 +1,4 @@
+# Hashes of file build rules.
+007949b2ad3bc20c59245423e444ed9c CMakeFiles/glsl_compile
+5d7f74061475cb939b3cb87f5f3f7fa8 frag_shader.spv
+4525e6355724712aaa9f0450f143f25b vert_shader.spv

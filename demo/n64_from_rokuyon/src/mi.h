@@ -24,14 +24,11 @@
 
 namespace MI
 {
-    extern uint32_t interrupt;
     extern uint32_t mask;
 
     void reset();
     void write(uint32_t address, uint32_t value);
 
-    void setInterrupt(int bit);
-    void clearInterrupt(int bit);
 }
 
 #endif // MI_H

@@ -164,10 +164,12 @@ lookup:
     else
     {
         // Read a value from a group of registers
+        #if 0
         switch (pAddr >> 20)
         {
             case 0x46: return PI::read(pAddr);
         }
+		#endif
     }
 
     if (data != nullptr)

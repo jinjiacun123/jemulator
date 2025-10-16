@@ -62,7 +62,6 @@ void CPU_CP0::reset()
     
     compare = 0;
     status = 0x400004;
-    cause = 0;
     irqPending = false;
     endCycles = -1;
     scheduleCount();
@@ -89,8 +88,7 @@ void CPU_CP0::write(int index, int32_t value) //[by jim] need
 #if 1			
             // Set the compare register and acknowledge a timer interrupt
             compare = value;
-            cause &= ~0x8000;
-            
+			
             // Update the count register and reschedule its next update
             count += ((Core::globalCycles - startCycles) >> 2);
             scheduleCount();
@@ -102,8 +100,6 @@ void CPU_CP0::write(int index, int32_t value) //[by jim] need
         case 13: // Cause
 #if 1			
             // Set the software interrupt flags
-            cause = (cause & ~0x300) | (value & 0x300);
-            checkInterrupts();
             return;
 #else
 			UNIMPLEMENT
@@ -149,8 +145,7 @@ void CPU_CP0::updateCount()//[by jim] need
     // Update count and request a timer interrupt if it matches compare
     if ((count += ((endCycles - startCycles) >> 2)) == compare)
     {
-        cause |= 0x8000;
-        checkInterrupts();
+		;
     }
 
     // Schedule the next update unconditionally
@@ -161,15 +156,6 @@ void CPU_CP0::updateCount()//[by jim] need
 #endif
 }
 
-void CPU_CP0::checkInterrupts()//[by jim] need
-{
-#if 1
-    // Set the external interrupt bit if any MI interrupt is set
-    cause = (cause & ~0x400) | ((bool)(MI::interrupt & MI::mask) << 10);
-#else
-	UNIMPLEMENT;
-#endif
-}
 
 void CPU_CP0::exception(uint8_t type)//[by jim] need,  where type in (3, 11, 12)
 										/**
@@ -182,16 +168,9 @@ void CPU_CP0::exception(uint8_t type)//[by jim] need,  where type in (3, 11, 12)
     // Update registers for an exception and jump to the handler
     // TODO: handle nested exceptions
     status |= 0x2; // EXL
-    cause = (cause & ~0x8000007C) | ((type << 2) & 0x7C);
 #if 1// [by jim] ??
     CPU::nextOpcode = 0;
 #endif	
-
-    // Return to the preceding branch if the exception occured in a delay slot
-    if (CPU::delaySlot != -1)
-    {
-        cause |= (1 << 31); // BD
-    }
 
     // Unhalt the CPU if it was idling
     Core::cpuRunning = true;
@@ -206,7 +185,6 @@ bool CPU_CP0::cpUsable(uint8_t cp)//[by jim] need
     if (!(status & (1 << (28 + cp))) && (cp > 0 || (!(status & 0x6) && (status & 0x18))))
     {
         // Set the coprocessor number bits
-        cause = (cause & ~(0x3 << 28)) | ((cp & 0x3) << 28);
         return false;
     }
 

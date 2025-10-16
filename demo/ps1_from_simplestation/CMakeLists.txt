@@ -1,0 +1,120 @@
+cmake_minimum_required(VERSION 3.3)
+project(SimpleStation C)
+
+set(CMAKE_C_FLAGS_DEBUG "-Wall -Wextra -Wno-unused-parameter -g")
+set(CMAKE_C_FLAGS_MINSIZEREL "-Wall -Wextra -Wno-unused-parameter -O0")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-Wall -Wextra -Wno-unused-parameter -g -O2")
+set(CMAKE_C_FLAGS_RELEASE "-Wall -Wextra -Wno-unused-parameter -O2")
+
+if (DEBUG_CPU)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUG_CPU")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG_CPU")
+set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -DDEBUG_CPU")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -DDEBUG_CPU")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DDEBUG_CPU")
+endif()
+
+if (DUMP_VRAM)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDUMP_VRAM")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDUMP_VRAM")
+set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -DDUMP_VRAM")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -DDUMP_VRAM")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DDUMP_VRAM")
+endif()
+
+if (GDBSTUB_SUPPORT)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DGDBSTUB_SUPPORT")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DGDBSTUB_SUPPORT")
+set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -DGDBSTUB_SUPPORT")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -DGDBSTUB_SUPPORT")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DGDBSTUB_SUPPORT")
+endif()
+
+if (VULKAN_SUPPORT)
+find_package(Vulkan REQUIRED)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DVULKAN_SUPPORT")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DVULKAN_SUPPORT")
+set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -DVULKAN_SUPPORT")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -DVULKAN_SUPPORT")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DVULKAN_SUPPORT")
+endif()
+
+if (ASAN)
+add_compile_options(-fsanitize=address -g)
+add_link_options(-fsanitize=address)
+endif()
+
+find_package(GLEW REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(Vulkan REQUIRED)
+find_package(SDL2 REQUIRED)
+
+include_directories(${OPENGL_INCLUDE_DIRS} ${VULKAN_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS} "include/")
+
+
+option(USE_GCC "Use GCC C Compiler instead of LLVMs Clang" OFF)
+option(TESTS "Build SimpleStation in Unit Test Mode" OFF)
+
+
+if(USE_GCC)
+endif()
+
+file(GLOB_RECURSE SRC_FILES ${PROJECT_SOURCE_DIR}/*.c)
+
+set (EXCLUDE_DIR "/CMakeFiles/")
+file (GLOB_RECURSE SRC_FILES "*.cpp" "*.c")
+foreach (TMP_PATH ${SRC_FILES})
+    string (FIND ${TMP_PATH} ${EXCLUDE_DIR} EXCLUDE_DIR_FOUND)
+    if (NOT ${EXCLUDE_DIR_FOUND} EQUAL -1)
+        list (REMOVE_ITEM SRC_FILES ${TMP_PATH})
+    endif ()
+endforeach(TMP_PATH)
+
+set (EXCLUDE_DIR "/external/")
+foreach (TMP_PATH ${SRC_FILES})
+    string (FIND ${TMP_PATH} ${EXCLUDE_DIR} EXCLUDE_DIR_FOUND)
+    if (NOT ${EXCLUDE_DIR_FOUND} EQUAL -1)
+        list (REMOVE_ITEM SRC_FILES ${TMP_PATH})
+    endif ()
+endforeach(TMP_PATH)
+
+if(TESTS)
+list(REMOVE_ITEM SRC_FILES ${CMAKE_SOURCE_DIR}/simplestation.c)
+else(NOT TESTS)
+list(REMOVE_ITEM SRC_FILES ${CMAKE_SOURCE_DIR}/tests/test.c)
+endif()
+
+
+add_executable(simplestation ${SRC_FILES})
+
+file(GLOB GLSL_SOURCE_FILES
+    "frag_shader.frag"
+    "vert_shader.vert"
+)
+
+foreach(GLSL ${GLSL_SOURCE_FILES})
+  get_filename_component(FILE_NAME ${GLSL} NAME_WE)
+  set(SPIRV "${FILE_NAME}.spv")
+  add_custom_command(
+    OUTPUT ${SPIRV}
+    COMMAND glslangValidator -V ${GLSL} -o ${SPIRV}
+    DEPENDS ${GLSL})
+  list(APPEND SPIRV_BINARY_FILES ${SPIRV})
+endforeach(GLSL)
+
+add_custom_target(glsl_compile DEPENDS ${SPIRV_BINARY_FILES})
+
+add_dependencies(simplestation glsl_compile)
+
+target_link_libraries(simplestation ${SDL2_LIBRARIES} glfw cglm_headers)
+
+add_subdirectory(external/cglm/ EXCLUDE_FROM_ALL)
+
+if (APPLE)
+  target_link_libraries(simplestation GLEW::GLEW "-framework OpenGL" Vulkan::Vulkan)
+elseif(NOT APPLE AND NOT WIN32)
+  target_link_libraries(simplestation ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES} vulkan)
+else(NOT APPLE AND NOT UNIX)
+  target_link_libraries(simplestation ${GLEW_LIBRARIES} ${OPENGL_LIBRARIES} vulkan-1)
+endif()

@@ -28,7 +28,6 @@ namespace CPU_CP0
     void write(int index, int32_t value);
 
     void resetCycles();
-    void checkInterrupts();
     void exception(uint8_t type);
     bool cpUsable(uint8_t cp);
 }

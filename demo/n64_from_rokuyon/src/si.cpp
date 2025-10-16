@@ -54,7 +54,6 @@ void SI::write(uint32_t address, uint32_t value)//[by jim] need
 
         case 0x4800018: // SI_STATUS
 		 // Acknowledge an SI interrupt
-            MI::clearInterrupt(1);
             return;
 			
 

@@ -22,16 +22,14 @@
 #include "log.h"
 #include <stdlib.h>
 
-namespace MI
+namespace MI //[by jim] MIPS Interface
 {
-    uint32_t interrupt;
     uint32_t mask;
 }
 
 void MI::reset()    //[by jim] need use
 {
-    // Reset the MI to its initial state
-    interrupt = 0;
+    // Reset the MI to its initial state   
     mask = 0;
 }
 
@@ -42,43 +40,40 @@ void MI::write(uint32_t address, uint32_t value)	//[by jim] need use
     {
         case 0x4300000: // MI_MODE        	
             // Acknowledge a DP interrupt when bit 11 is set
-            if (value & 0x800)
-                clearInterrupt(5);
-
-            // Keep track of unimplemented bits that should do something
-            if (uint32_t bits = (value & 0x37FF))
-                LOG_WARN("Unimplemented MI mode bits set: 0x%X\n", bits);
             return;
 
         case 0x430000C: // MI_MASK
+           /*
+			   0x0430000C - MI_INTR_MASK_REG (Read / Write)
+			   This register sets up a mask. If (MI_INTR_REG & MI_INTR_MASK_REG) != 0, then a MIPS interrupt is raised.
+			   
+			   Writes
+			   Bit Explanation
+			   0   Clear SP Mask
+			   1   Set SP Mask
+			   2   Clear SI Mask
+			   3   Set SI Mask
+			   4   Clear AI Mask
+			   5   Set AI Mask
+			   6   Clear VI Mask
+			   7   Set VI Mask
+			   8   Clear PI Mask
+			   9   Set PI Mask
+			   10  Clear DP Mask
+			   11  Set DP Mask
+           */
             // For each set bit, set or clear a mask bit appropriately
             for (int i = 0; i < 12; i += 2)
             {
-                if (value & (1 << i))
-                    mask &= ~(1 << (i / 2));
-                else if (value & (1 << (i + 1)))
-                    mask |= (1 << (i / 2));
+                if (value & (1 << i))			//odd
+                    mask &= ~(1 << (i / 2));	//[by jim]:set i/2 bit where to 0,other is container. clear i/2 bit
+                else if (value & (1 << (i + 1)))//even
+                    mask |= (1 << (i / 2));     //[by jim]: set 1 to i/2 bit
             }
-
-            CPU_CP0::checkInterrupts();
             return;
 
         default:
             LOG_WARN("Unknown MI register write: 0x%X\n", address);
             return;
     }	
-}
-
-void MI::setInterrupt(int bit)//[by jim] need use
-{
-    // Request an interrupt by setting its bit
-    interrupt |= (1 << bit);
-    CPU_CP0::checkInterrupts();
-}
-
-void MI::clearInterrupt(int bit)//[by jim] need use
-{
-    // Acknowledge an interrupt by clearing its bit
-    interrupt &= ~(1 << bit);
-    CPU_CP0::checkInterrupts();
 }
